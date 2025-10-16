@@ -283,6 +283,7 @@ class PacmanGame:
             # cập nhật số bước đi
             self.step += 1
             self.power_mode_steps -= 1 # Trừ 1 bước cho hành động ăn tường
+            print(f'So buoc con lai {self.power_mode_steps}')
             # Kiểm tra ăn thức ăn
             if self.pacman_pos in self.food_pos:
                 self.food_pos.remove(self.pacman_pos)
@@ -290,9 +291,8 @@ class PacmanGame:
                 self.magical_pie.remove(self.pacman_pos)
                 self.power_mode_steps = 5
                 print('an tuong trong 5 buoc')
-            if self.pacman_pos == self.exitgate_pos and len(self.food_pos) == 6:
+            if self.pacman_pos == self.exitgate_pos and len(self.food_pos) <= 0:
                 self.game_state = 'win'
-                print('ok')
                 
     def draw_step(self):
         """
@@ -424,7 +424,7 @@ class PacmanGame:
             self.draw_food()
             self.draw_pacman()
             self.draw_magical_pie()
-            if len(self.food_pos) == 6:
+            if len(self.food_pos) <= 0:
                 self.draw_exitgate()
             
             # Vẽ điểm số và số thức ăn đã lấy được
@@ -433,7 +433,6 @@ class PacmanGame:
 
             # Vẽ màn hình chiến thắng nếu game đã kết thúc
             if self.game_state == 'win':
-                print('da ve')
                 self.draw_win_screen()
 
             # Giới hạn tốc độ khung hình (ví dụ: 30 FPS)
