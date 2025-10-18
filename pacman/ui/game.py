@@ -9,7 +9,7 @@ from pacman.ui.renderer import Renderer
 from pacman.agents.manual_agent import ManualAgent
 from pacman.agents.auto_agent import AutoAgent
 
-CELL_SIZE = 30
+CELL_SIZE = 20
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 0)
 WHITE = (255, 255, 255)
@@ -126,49 +126,94 @@ class ModeSelectionScreen:
 
 class GameEngine:
     def __init__(self, layout_file, agent_class):
-        
-        # Khởi tạo Grid và GameState
-        self.grid = Grid(layout_file)
+        try:
+            print(f"Initializing game with layout: {layout_file}")
+            
+            # Khởi tạo Grid và GameState
+            self.grid = Grid(layout_file)
+            print(f"Grid loaded: {self.grid.rows}x{self.grid.cols}")
 
-        self.initial_ghosts = tuple() # TODO: Khởi tạo trạng thái ban đầu của Ghosts
-        self.game_state = GameState.get_initial_state(self.grid, self.initial_ghosts)
-        
-        # Cấu hình màn hình
+            self.initial_ghosts = tuple() # TODO: Khởi tạo trạng thái ban đầu của Ghosts
+            self.game_state = GameState.get_initial_state(self.grid)        
+            print(f"Game state initialized")
+
+            # Cấu hình màn hình
+            self.screen_width = self.grid.cols * CELL_SIZE
+            self.screen_height = (self.grid.rows + 2) * CELL_SIZE
+            print(f"Screen size: {self.screen_width}x{self.screen_height}")
+            
+            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+            pygame.display.set_caption("Pacman")
+            print("Screen created successfully")
+
+            # Khởi tạo Rules
+            self.rules = Rules(self.grid)
+            print("Rules initialized")
+            
+            # Khởi tạo Renderer
+            self.renderer = Renderer(self.screen, self.grid)
+            print("Renderer initialized")
+            
+            # Khởi tạo Agent
+            if agent_class.__name__ == 'AutoAgent':
+                # Allow choosing heuristic type for AutoAgent
+                heuristic_type = "tsp_maze"  # Default to best heuristic
+                self.agent = agent_class(self.grid, self.rules, heuristic_type)
+                print(f"AutoAgent using {heuristic_type} heuristic")
+            else:
+                self.agent = agent_class()
+            print(f"Agent initialized: {agent_class.__name__}")
+            
+            self.game_status = 'running' # 'running', 'win', 'lose'
+            self.clock = pygame.time.Clock()
+            print("Game initialization completed successfully")
+            
+        except Exception as e:
+            print(f"Error during game initialization: {e}")
+            import traceback
+            traceback.print_exc()
+            raise e
+
+    def _update_screen_after_rotation(self):
+        """
+        Cập nhật màn hình sau khi mê cung bị xoay.
+        """
+        # Cập nhật kích thước màn hình
         self.screen_width = self.grid.cols * CELL_SIZE
         self.screen_height = (self.grid.rows + 2) * CELL_SIZE
+        
+        # Tạo màn hình mới với kích thước mới
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Pacman")
-
-        # Khởi tạo Renderer
-        self.renderer = Renderer(self.screen, self.grid)
         
-        # Khởi tạo Agent
-        self.agent = agent_class() 
-        self.pacman_direction = 0 # 0: Phải, 90: Lên, 180: Trái, 270: Xuống
-        self.game_status = 'running' # 'running', 'win', 'lose'
-
-        # Khởi tạo Rules
-        self.rules = Rules(self.grid)
-        self.clock = pygame.time.Clock()
+        # Cập nhật renderer với grid mới và screen mới
+        self.renderer.update_grid(self.grid)
+        self.renderer.update_screen(self.screen)
 
     def reset_game(self):
             """
             Tải lại game về trạng thái ban đầu.
             """
             print("Resetting game...")
-            # Tải lại grid từ file (để khôi phục tường đã ăn)
-            self.grid = Grid(self.grid.layout_file) 
+            # Reset mê cung về trạng thái ban đầu (không xoay)
+            self.grid.reset_to_initial_state()
             
             # Tạo lại state ban đầu
-            self.game_state = GameState.get_initial_state(self.grid, self.initial_ghosts)
+            self.game_state = GameState.get_initial_state(self.grid)
             
             # Cập nhật tham chiếu grid cho rules và renderer
             self.rules.grid = self.grid
             self.renderer.grid = self.grid
             
+            # Cập nhật màn hình sau khi reset
+            self._update_screen_after_rotation()
+            
             # Reset các biến trạng thái game
-            self.pacman_direction = 0
             self.game_status = 'running'
+            
+            # Reset biến xoay mê cung
+            if hasattr(self, '_last_rotation_step'):
+                delattr(self, '_last_rotation_step')
 
     def run(self):
         running = True
@@ -194,40 +239,110 @@ class GameEngine:
 
             # --- Cập nhật Logic Game (Transition) ---
             if self.game_status == 'running': 
-                
                 self.renderer.update_animation() 
-                self.renderer.update_animation_magical_pie() 
+                self.renderer.update_animation_magical_pie()
+                self.renderer.update_teleport_animation() 
 
                 # --- LẤY HÀNH ĐỘNG TỪ AGENT (SAU KHI ĐÃ XỬ LÝ EVENTS) ---
                 action = self.agent.get_action(self.game_state)
                 
-                # --- CẬP NHẬT HƯỚNG XOAY (CHUNG CHO CẢ HAI AGENT) ---
+                # --- KIỂM TRA VA CHẠM TRƯỚC KHI DI CHUYỂN ---
+                # LUÔN LUÔN kiểm tra va chạm - bất cứ khi nào chạm Ghost đều thua
                 if action:
+                    pacman_pos = self.game_state.pacman.pos
                     dr, dc = action
-                    if dr == -1 and dc == 0: self.pacman_direction = 90  # Lên 
-                    elif dr == 1 and dc == 0: self.pacman_direction = 270 # Xuống 
-                    elif dr == 0 and dc == -1: self.pacman_direction = 180 # Trái 
-                    elif dr == 0 and dc == 1: self.pacman_direction = 0   # Phải 
+                    new_pacman_pos = (pacman_pos[0] + dr, pacman_pos[1] + dc)
+                    
+                    # Kiểm tra va chạm với từng Ghost
+                    for ghost in self.game_state.ghosts:
+                        # Tính toán vị trí mới của Ghost (nếu Ghost di chuyển)
+                        new_ghost = ghost.get_updated_state(self.grid)
+                        new_ghost_pos = new_ghost.pos
+                        
+                        # Kiểm tra các trường hợp va chạm (LUÔN LUÔN):
+                        # 1. Pacman di chuyển đến vị trí hiện tại của Ghost
+                        if new_pacman_pos == ghost.pos:
+                            self.game_status = 'lose'
+                            break
+                        # 2. Cả hai di chuyển đến cùng một vị trí
+                        elif new_pacman_pos == new_ghost_pos:
+                            self.game_status = 'lose'
+                            break
+                
+                # --- KIỂM TRA XOAY MÊ CUNG (sau mỗi 30 bước) ---
+                if self.game_status != 'lose':
+                    step_count = self.game_state.step_count
+                    # Chỉ xoay khi step_count vừa đạt bội số của 30 và chưa xoay lần này
+                    if step_count > 0 and step_count % 30 == 0 and (not hasattr(self, '_last_rotation_step') or self._last_rotation_step != step_count):
+                        try:
+                            # Lưu kích thước cũ để tính toán xoay
+                            old_rows = self.grid.rows
+                            old_cols = self.grid.cols
+                            
+                            # Xoay mê cung
+                            self.grid.rotate_90_degrees_right()
+                            
+                            # Xoay tất cả các vị trí entities
+                            self.game_state = self.rules._rotate_entity_positions(self.game_state, old_rows, old_cols)
+                            
+                            # Cập nhật màn hình sau khi xoay
+                            self._update_screen_after_rotation()
+                            
+                            # Đánh dấu đã xoay ở step này
+                            self._last_rotation_step = step_count
+                            
+                        except Exception as e:
+                            print(f"Error rotating maze at step {step_count}: {e}")
+                
+                # --- XỬ LÝ TELEPORTATION SELECTION ---
+                if hasattr(self.agent, 'teleport_choice') and self.agent.teleport_choice is not None:
+                    if self.game_state.pacman.waiting_for_teleport:
+                        self.game_state = self.rules.handle_teleport_selection(self.game_state, self.agent.teleport_choice)
+                        self.agent.teleport_choice = None  # Reset choice
                 
                 # --- APPLY ACTION: Dùng Rules để tính GameState tiếp theo ---
-                if action:
-                    self.game_state = self.rules.get_successor(self.game_state, action) 
+                if action and self.game_status != 'lose':
+                    old_cols = self.grid.cols
+                    old_rows = self.grid.rows
                     
-                # --- KIỂM TRA ĐIỀU KIỆN THẮNG ---
-                food_left = len(self.game_state.food_left) 
-                at_exit = self.game_state.pacman_pos == self.grid.exitgate_pos 
-                
-                if food_left <= 0 and at_exit: 
-                    self.game_status = 'win' 
+                    self.game_state = self.rules.get_successor(self.game_state, action)
+                    
+                    # Kiểm tra xem mê cung có bị xoay không
+                    if self.grid.cols != old_cols or self.grid.rows != old_rows:
+                        self._update_screen_after_rotation()
+                            
+                    # --- KIỂM TRA VA CHẠM SAU KHI DI CHUYỂN (BACKUP CHECK) ---
+                    # LUÔN LUÔN kiểm tra va chạm - bất cứ khi nào chạm Ghost đều thua
+                    if self.game_status != 'lose':
+                        pacman_pos = self.game_state.pacman.pos
+                        for ghost in self.game_state.ghosts:
+                            if ghost.pos == pacman_pos:
+                                self.game_status = 'lose'
+                                break
+
+                    # Nếu chưa thua, kiểm tra thắng
+                    if self.game_status != 'lose':
+                        food_left = len(self.game_state.food_left) 
+                        at_exit = self.game_state.pacman.pos == self.grid.exitgate_pos
+                        
+                        if food_left <= 0 and at_exit: # Điều kiện thắng 
+                            self.game_status = 'win'
 
             # --- VẼ ---
-            self.renderer.draw_all(self.game_state, self.pacman_direction) 
+            self.renderer.draw_all(self.game_state)
 
             if self.game_status == 'win': 
                 self.renderer.draw_win_screen(self.game_state.step_count) 
+            elif self.game_status == 'lose':
+                self.renderer.draw_lose_screen()
 
             pygame.display.flip() 
-            self.clock.tick(60) 
+            
+            # Điều chỉnh tốc độ dựa trên loại agent
+            if hasattr(self.agent, 'heuristic_type'):  # AutoAgent
+                self.clock.tick(10) # 10 FPS = 0.1 giây cho mỗi bước)
+            else:  # ManualAgent
+                self.clock.tick(60)  # 60 FPS cho manual 
         
         # Trả về 'quit' nếu vòng lặp bị phá vỡ
         return 'quit'

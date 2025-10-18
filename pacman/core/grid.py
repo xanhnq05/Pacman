@@ -8,7 +8,6 @@ class Grid:
     Cũng xử lý các luật liên quan đến cấu trúc map như Teleport và Xoay.
     """
     def __init__(self, layout_file):
-        # Đường dẫn file layout
         self.layout_file = layout_file
         # self.layout_list sẽ lưu mảng 2D (list of lists) để có thể chỉnh sửa (ăn tường, xoay)
         self.layout_list = self._load_layout() 
@@ -21,8 +20,12 @@ class Grid:
         self.initial_magical_pie = []
         self.exitgate_pos = None
         self.teleport_corners = []
+        self.initial_ghosts_info = []
 
         self._find_initial_objects()
+        
+        # Lưu trạng thái ban đầu để có thể reset
+        self._save_initial_state()
 
     def _load_layout(self):
         """
@@ -44,6 +47,7 @@ class Grid:
         """
         Tìm và lưu trữ vị trí ban đầu của Pacman, thức ăn, cổng thoát, v.v.
         """
+        self.initial_ghosts_info = []
         for r in range(self.rows):
             for c in range(self.cols):
                 char = self.layout_list[r][c]
@@ -55,13 +59,19 @@ class Grid:
                     self.initial_magical_pie.append((r, c))
                 elif char == 'E':
                     self.exitgate_pos = (r, c)
+                elif char == 'G':
+                    direction = (0, 1) # Di chuyển sang phải
+                    # Gán màu khác nhau cho mỗi ma dựa trên vị trí
+                    ghost_colors = ["red", "pink", "blue", "orange"]
+                    color = ghost_colors[len(self.initial_ghosts_info) % len(ghost_colors)]
+                    self.initial_ghosts_info.append(((r, c), color, direction))
         
-        # Xác định 4 góc mê cung cho Teleport (đơn giản hóa)
+        # Xác định 4 góc mê cung cho Teleport (di chuyển vào trong 1 ô để tránh tường)
         self.teleport_corners = [
-            (0, 0),                         # Top-Left
-            (0, self.cols - 1),             # Top-Right
-            (self.rows - 1, 0),             # Bottom-Left
-            (self.rows - 1, self.cols - 1)  # Bottom-Right
+            (1, 1),                         # Top-Left (vào trong 1 ô)
+            (1, self.cols - 2),             # Top-Right (vào trong 1 ô)
+            (self.rows - 2, 1),             # Bottom-Left (vào trong 1 ô)
+            (self.rows - 2, self.cols - 2)  # Bottom-Right (vào trong 1 ô)
         ]
 
     def is_wall(self, pos):
@@ -75,19 +85,76 @@ class Grid:
         """
         Xử lý việc xoay mê cung 90 độ sang phải (yêu cầu của đề bài).
         """
-        # Cập nhật layout mới (xoay)
-        new_rows = self.cols
-        new_cols = self.rows
-        new_layout = [['' for _ in range(new_cols)] for _ in range(new_rows)]
+        try:
+            # Lưu kích thước cũ để tính toán xoay
+            old_rows = self.rows
+            old_cols = self.cols
+            
+            # Cập nhật layout mới (xoay)
+            new_rows = self.cols
+            new_cols = self.rows
+            new_layout = [['' for _ in range(new_cols)] for _ in range(new_rows)]
+            
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    # Công thức xoay 90 độ sang phải: (r, c) -> (c, rows - 1 - r)
+                    new_r = c
+                    new_c = self.rows - 1 - r
+                    if 0 <= new_r < new_rows and 0 <= new_c < new_cols:
+                        new_layout[new_r][new_c] = self.layout_list[r][c]
+                        
+            self.layout_list = new_layout
+            self.rows = new_rows
+            self.cols = new_cols
+            
+            # Cập nhật lại vị trí các đối tượng sau khi xoay
+            self._update_positions_after_rotation(old_rows)
+            
+        except Exception as e:
+            print(f"Error during maze rotation: {e}")
+            # Không xoay nếu có lỗi
+            pass
+    
+    def _update_positions_after_rotation(self, old_rows=None):
+        """
+        Cập nhật vị trí các đối tượng sau khi xoay mê cung.
+        """
+        # Cập nhật vị trí cổng thoát
+        if self.exitgate_pos:
+            old_r, old_c = self.exitgate_pos
+            # Công thức xoay 90 độ sang phải: (r, c) -> (c, old_rows - 1 - r)
+            # Sử dụng old_rows nếu được cung cấp, nếu không thì dùng self.rows
+            rows_to_use = old_rows if old_rows is not None else self.rows
+            new_r, new_c = old_c, rows_to_use - 1 - old_r
+            # Kiểm tra vị trí mới có hợp lệ không
+            if 0 <= new_r < self.rows and 0 <= new_c < self.cols:
+                self.exitgate_pos = (new_r, new_c)
+            else:
+                # Nếu vị trí mới không hợp lệ, tìm vị trí gần nhất
+                self.exitgate_pos = (min(new_r, self.rows - 1), min(new_c, self.cols - 1))
         
-        for r in range(self.rows):
-            for c in range(self.cols):
-                # Công thức xoay 90 độ sang phải: (r, c) -> (c, new_rows - 1 - r)
-                new_layout[c][new_rows - 1 - r] = self.layout_list[r][c]
-
-        self.layout_list = new_layout
-        self.rows = new_rows
-        self.cols = new_cols
+        # Cập nhật lại các góc teleport (di chuyển vào trong 1 ô để tránh tường)
+        self.teleport_corners = [
+            (1, 1),                         # Top-Left (vào trong 1 ô)
+            (1, self.cols - 2),             # Top-Right (vào trong 1 ô)
+            (self.rows - 2, 1),             # Bottom-Left (vào trong 1 ô)
+            (self.rows - 2, self.cols - 2)  # Bottom-Right (vào trong 1 ô)
+        ]
+    
+    def is_teleport_corner(self, pos):
+        """
+        Kiểm tra xem vị trí có phải là góc teleport không.
+        """
+        return pos in self.teleport_corners
+    
+    def get_teleport_destinations(self, current_pos):
+        """
+        Lấy danh sách các vị trí teleport có thể đến từ vị trí hiện tại.
+        """
+        if self.is_teleport_corner(current_pos):
+            # Trả về tất cả các góc teleport trừ góc hiện tại
+            return [corner for corner in self.teleport_corners if corner != current_pos]
+        return []
         
     def eat_wall(self, pos):
             """
@@ -101,3 +168,25 @@ class Grid:
 
 # Cập nhật lại vị trí các đối tượng tĩnh như cổng thoát (nếu cần thiết)
 # (Đây là phần phức tạp, có thể để lại sau)
+
+    def _save_initial_state(self):
+        """
+        Lưu trạng thái ban đầu của mê cung để có thể reset.
+        """
+        # Lưu layout ban đầu
+        self.initial_layout = [row[:] for row in self.layout_list]  # Deep copy
+        self.initial_rows = self.rows
+        self.initial_cols = self.cols
+        self.initial_exitgate_pos = self.exitgate_pos
+        self.initial_teleport_corners = self.teleport_corners[:]  # Copy list
+    
+    def reset_to_initial_state(self):
+        """
+        Reset mê cung về trạng thái ban đầu.
+        """
+        # Khôi phục layout ban đầu
+        self.layout_list = [row[:] for row in self.initial_layout]  # Deep copy
+        self.rows = self.initial_rows
+        self.cols = self.initial_cols
+        self.exitgate_pos = self.initial_exitgate_pos
+        self.teleport_corners = self.initial_teleport_corners[:]  # Copy list

@@ -10,6 +10,7 @@ class ManualAgent:
     def __init__(self):
         print("ManualAgent has ready.")
         self.next_action = None # Sẽ lưu trữ (dr, dc)
+        self.teleport_choice = None # Sẽ lưu trữ 1, 2, 3, hoặc 4
 
     def process_event(self, event):
         """
@@ -18,7 +19,17 @@ class ManualAgent:
         """
         # Chỉ xử lý khi phím được NHẤN XUỐNG
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
+            # Xử lý phím teleportation (1-4)
+            if event.key == pygame.K_1:
+                self.teleport_choice = 1
+            elif event.key == pygame.K_2:
+                self.teleport_choice = 2
+            elif event.key == pygame.K_3:
+                self.teleport_choice = 3
+            elif event.key == pygame.K_4:
+                self.teleport_choice = 4
+            # Xử lý phím di chuyển (mũi tên)
+            elif event.key == pygame.K_UP:
                 self.next_action = (-1, 0) # (dr, dc) - Lên
             elif event.key == pygame.K_DOWN:
                 self.next_action = (1, 0)  # Xuống
