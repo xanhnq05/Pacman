@@ -11,8 +11,7 @@ SCREEN_HEIGHT = 500
 
 def parse_args_and_get_config():
     """
-    Hàm này chịu trách nhiệm hiển thị màn hình chọn chế độ.
-    Nó sẽ trả về layout_path và agent_class nếu chọn thành công.
+    Hàm này sẽ chọn chế độ chơi -> trả về đường dẫn của file và agent class(manual or auto mode).
     """
     selection_screen = ModeSelectionScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
     
@@ -23,7 +22,7 @@ def parse_args_and_get_config():
     return layout_path, agent_class
 
 def main():
-    os.environ['SDL_VIDEO_CENTERED'] = '1'
+    os.environ['SDL_VIDEO_CENTERED'] = '1'  # hiển thị screen ở giữa màn hình
     pygame.init()
     
     game_mode = 'menu'
@@ -37,14 +36,14 @@ def main():
 
             except Exception:
                 print("Player has exit.")
-                break # Thoát vòng lặp chính
+                break
 
         elif game_mode == 'running':
             # --- Chạy Game Engine ---
             print("\n-----------------------------------------")
             print(f"Choosen mode: {agent_class.__name__}")
-            print("Game loading...")
-            
+            print("-----------------------------------------")
+
             game = GameEngine(
                 layout_file=layout_path, 
                 agent_class=agent_class
@@ -61,9 +60,9 @@ def main():
             if run_status == 'menu':
                 game_mode = 'menu' # Quay lại màn hình chọn chế độ
             elif run_status == 'quit':
-                break # Thoát chương trình
+                break
 
-    print("-----------------------------------------")
+    print("\n-----------------------------------------")
     print("The end!")
     pygame.quit()
     sys.exit()

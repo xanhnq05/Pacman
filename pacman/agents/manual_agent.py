@@ -1,24 +1,42 @@
 # pacman/agents/manual_agent.py
+import pygame
 
 class ManualAgent:
     """
     Agent nhận input từ người dùng qua phím mũi tên.
+    Nó đăng ký hành động khi một phím được nhấn (trong process_event)
+    và trả về hành động đó khi được GameEngine hỏi (trong get_action).
     """
     def __init__(self):
         print("ManualAgent has ready.")
-    
-    def get_action(self, game_state):
-        # Đây sẽ là nơi đọc input từ Pygame
-        return "Manual Action"
-    
-# pacman/agents/manual_agent.py
+        self.next_action = None # Sẽ lưu trữ (dr, dc)
 
-class ManualAgent:
-    def __init__(self):
-        # Không cần logic phức tạp
-        pass
+    def process_event(self, event):
+        """
+        Hàm này được gọi bởi GameEngine bên trong vòng lặp sự kiện.
+        Nó "lắng nghe" các phím được nhấn và lưu hành động tương ứng.
+        """
+        # Chỉ xử lý khi phím được NHẤN XUỐNG
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                self.next_action = (-1, 0) # (dr, dc) - Lên
+            elif event.key == pygame.K_DOWN:
+                self.next_action = (1, 0)  # Xuống
+            elif event.key == pygame.K_LEFT:
+                self.next_action = (0, -1) # Trái
+            elif event.key == pygame.K_RIGHT:
+                self.next_action = (0, 1)  # Phải
     
     def get_action(self, game_state):
-        # Trả về None trong chế độ Manual, vì hành động được xử lý trực tiếp 
-        # trong vòng lặp Pygame (GameEngine) từ input bàn phím.
-        return None
+        """
+        Hàm này được gọi bởi GameEngine sau vòng lặp sự kiện (mỗi frame).
+        Nó trả về hành động đã đăng ký và xóa nó đi (để đảm bảo 1 lần nhấn = 1 lần di chuyển).
+        """
+        # Lấy hành động đã lưu
+        action_to_return = self.next_action
+        
+        # Xóa hành động (để không lặp lại ở frame sau)
+        self.next_action = None 
+        
+        # Trả về hành động (hoặc None nếu không có phím nào được nhấn)
+        return action_to_return

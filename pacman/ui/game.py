@@ -19,13 +19,13 @@ ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
 
 class ModeSelectionScreen:
     """
-    Giao diện chọn chế độ chơi đẹp hơn, có hình ảnh và hiệu ứng.
+    Giao diện chọn chế độ chơi.
     """
     def __init__(self, width, height):
         self.screen_width = width
         self.screen_height = height
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("Pacman - Play Mode")
+        pygame.display.set_caption("Pacman - Mode")
 
         # Font
         self.font_title = pygame.font.Font(None, 90)
@@ -126,7 +126,7 @@ class ModeSelectionScreen:
 
 class GameEngine:
     def __init__(self, layout_file, agent_class):
-
+        
         # Khởi tạo Grid và GameState
         self.grid = Grid(layout_file)
 
@@ -147,25 +147,9 @@ class GameEngine:
         self.pacman_direction = 0 # 0: Phải, 90: Lên, 180: Trái, 270: Xuống
         self.game_status = 'running' # 'running', 'win', 'lose'
 
-        # TODO: Implement Rules (Logic chuyển trạng thái)
-        # self.rules = Rules(self.grid)
-
         # Khởi tạo Rules
-        self.rules = Rules(self.grid) # <-- THÊM DÒNG NÀY
+        self.rules = Rules(self.grid)
         self.clock = pygame.time.Clock()
-
-    def _get_action_from_manual(self, event):
-        """Xử lý input bàn phím cho chế độ thủ công."""
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                return (-1, 0), 90 # (dr, dc), direction
-            elif event.key == pygame.K_DOWN:
-                return (1, 0), 270
-            elif event.key == pygame.K_LEFT:
-                return (0, -1), 180
-            elif event.key == pygame.K_RIGHT:
-                return (0, 1), 0
-        return None, self.pacman_direction
 
     def reset_game(self):
             """
@@ -189,76 +173,61 @@ class GameEngine:
     def run(self):
         running = True
         while running:
-            
-            # --- Xử lý sự kiện (Input) ---
-            action = None
+                        
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    running = False
+                    return 'quit' 
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        return 'menu' # <-- Trả về 'menu' để main.py xử lý
+                        return 'menu' # <-- Trả về 'menu'
                     
-                    if self.game_status != 'running':
-                        if event.key == pygame.K_r:
-                            self.reset_game()
-                            continue # Bỏ qua phần còn lại của vòng lặp event
+                    if self.game_status != 'running': 
+                        if event.key == pygame.K_r: 
+                            self.reset_game() 
+                            continue 
 
-                    if self.game_status == 'running':
-                        if self.agent.__class__.__name__ == 'ManualAgent':
-                            # Chế độ thủ công
-                            move_vector, new_direction = self._get_action_from_manual(event)
-                            if move_vector:
-                                action = move_vector 
-                                self.pacman_direction = new_direction
+                # --- GỬI EVENT CHO AGENT ---
+                # Luôn gửi event cho agent để xử lí hành động
+                if self.game_status == 'running': 
+                    self.agent.process_event(event)
 
             # --- Cập nhật Logic Game (Transition) ---
-            if self.game_status == 'running':
+            if self.game_status == 'running': 
                 
-                # Cập nhật hoạt ảnh (chỉ cho GUI)
-                self.renderer.update_animation()
-                self.renderer.update_animation_magical_pie()
+                self.renderer.update_animation() 
+                self.renderer.update_animation_magical_pie() 
 
-                if self.agent.__class__.__name__ == 'AutoAgent':
-                    # Chế độ tự động: Lấy hành động từ A*
-                    action = self.agent.get_action(self.game_state)
-                    # TODO: Cập nhật self.pacman_direction dựa trên action A* của AutoAgent
-                    
-                    # Tạm thời, nếu Agent A* trả về action, ta có thể suy ra hướng xoay
-                    if action:
-                        dr, dc = action
-                        if dr == -1 and dc == 0: self.pacman_direction = 90  # Lên
-                        elif dr == 1 and dc == 0: self.pacman_direction = 270 # Xuống
-                        elif dr == 0 and dc == -1: self.pacman_direction = 180 # Trái
-                        elif dr == 0 and dc == 1: self.pacman_direction = 0   # Phải
+                # --- LẤY HÀNH ĐỘNG TỪ AGENT (SAU KHI ĐÃ XỬ LÝ EVENTS) ---
+                action = self.agent.get_action(self.game_state)
+                
+                # --- CẬP NHẬT HƯỚNG XOAY (CHUNG CHO CẢ HAI AGENT) ---
+                if action:
+                    dr, dc = action
+                    if dr == -1 and dc == 0: self.pacman_direction = 90  # Lên 
+                    elif dr == 1 and dc == 0: self.pacman_direction = 270 # Xuống 
+                    elif dr == 0 and dc == -1: self.pacman_direction = 180 # Trái 
+                    elif dr == 0 and dc == 1: self.pacman_direction = 0   # Phải 
                 
                 # --- APPLY ACTION: Dùng Rules để tính GameState tiếp theo ---
                 if action:
-                    # Gọi Rules để nhận trạng thái mới. 
-                    # Logic va chạm, ăn thức ăn/bánh, và Power Mode đã được xử lý bên trong rules.py
-                    self.game_state = self.rules.get_successor(self.game_state, action)
+                    self.game_state = self.rules.get_successor(self.game_state, action) 
                     
                 # --- KIỂM TRA ĐIỀU KIỆN THẮNG ---
-                food_left = len(self.game_state.food_left)
-                at_exit = self.game_state.pacman_pos == self.grid.exitgate_pos
+                food_left = len(self.game_state.food_left) 
+                at_exit = self.game_state.pacman_pos == self.grid.exitgate_pos 
                 
-                # Điều kiện thắng: Ăn gần hết thức ăn (<= 6) VÀ Pacman đang ở cổng thoát
-                # (Sử dụng <= 6 theo logic cũ của bạn)
-                if food_left <= 6 and at_exit:
-                    self.game_status = 'win'
+                if food_left <= 0 and at_exit: 
+                    self.game_status = 'win' 
 
             # --- VẼ ---
-            self.renderer.draw_all(self.game_state, self.pacman_direction)
+            self.renderer.draw_all(self.game_state, self.pacman_direction) 
 
-            # Vẽ màn hình thắng/thua nếu cần
-            if self.game_status == 'win':
-                self.renderer.draw_win_screen(self.game_state.step_count)
+            if self.game_status == 'win': 
+                self.renderer.draw_win_screen(self.game_state.step_count) 
 
-            # Cập nhật màn hình MỘT LẦN DUY NHẤT (Đã chuyển từ renderer.draw_all ra ngoài)
             pygame.display.flip() 
-
             self.clock.tick(60) 
-
-        pygame.quit()
-        sys.exit()
+        
+        # Trả về 'quit' nếu vòng lặp bị phá vỡ
+        return 'quit'
