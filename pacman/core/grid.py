@@ -35,7 +35,6 @@ class Grid:
         
         try:
             with open(full_path, 'r') as f:
-                # Trả về list of lists của các ký tự (ví dụ: [['%', '%', ...], [...]])
                 return [list(line.strip()) for line in f] 
         except FileNotFoundError:
             print(f"Lỗi: Không tìm thấy file layout tại {full_path}")
@@ -90,5 +89,15 @@ class Grid:
         self.rows = new_rows
         self.cols = new_cols
         
-        # Cập nhật lại vị trí các đối tượng tĩnh như cổng thoát (nếu cần thiết)
-        # (Đây là phần phức tạp, có thể để lại sau)
+    def eat_wall(self, pos):
+            """
+            Thay đổi một ô tường '%' thành ô trống ' ' trong layout_list.
+            """
+            r, c = pos
+            # Kiểm tra kỹ trong biên và đúng là tường
+            if 0 <= r < self.rows and 0 <= c < self.cols:
+                if self.layout_list[r][c] == '%':
+                    self.layout_list[r][c] = ' '
+
+# Cập nhật lại vị trí các đối tượng tĩnh như cổng thoát (nếu cần thiết)
+# (Đây là phần phức tạp, có thể để lại sau)
