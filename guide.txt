@@ -1,0 +1,29 @@
+Pacman/
+  assets/
+    ghost_images/
+    player_images/
+  data/
+    layout.txt
+    layouts/               # (nhiều layout thử nghiệm)
+  pacman/
+    __init__.py
+    core/
+      grid.py              # Lưới/map, đọc layout, tiện ích quay/teleport
+      state.py             # Định nghĩa GameState (bất biến, hashable)
+      entities.py          # Pacman, Ghost, quy tắc di chuyển ma
+      rules.py             # Luật chuyển trạng thái, phát sinh successor
+    search/
+      astar.py             # A* tái sử dụng, không phụ thuộc pygame
+      heuristics.py        # h1 (BFS), h2 (MST), cache khoảng cách
+      utils.py             # BFS maze distance, MST, memoization
+    agents/
+      manual_agent.py      # Nhận phím mũi tên, trả action
+      auto_agent.py        # Gọi A* tạo kế hoạch, phát action theo thời gian
+    ui/
+      renderer.py          # Vẽ tường, food, pies, gate, ma, pacman
+      game.py              # Vòng lặp pygame, quản lý mode, HUD
+  experiments/
+    bench.py               # Đo time/space (expansions, frontier), vẽ biểu đồ
+  main.py                  # Điểm vào: parse args (manual/auto, layout), chạy Game
+  requirements.txt
+  README.md
